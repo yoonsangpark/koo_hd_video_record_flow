@@ -185,8 +185,11 @@ static HD_RESULT set_cap_cfg(HD_PATH_ID *p_video_cap_ctrl)
 	char *chip_name = getenv("NVT_CHIP_ID");
 
     #if (RESOLUTION_SET == 0)
-	snprintf(cap_cfg.sen_cfg.sen_dev.driver_name, HD_VIDEOCAP_SEN_NAME_LEN-1, "nvt_sen_imx290");
-	printf("Using nvt_sen_imx290\n");
+	/* ooSSoo */
+	//snprintf(cap_cfg.sen_cfg.sen_dev.driver_name, HD_VIDEOCAP_SEN_NAME_LEN-1, "nvt_sen_imx290");
+	//printf("Using nvt_sen_imx290\n");
+	snprintf(cap_cfg.sen_cfg.sen_dev.driver_name, HD_VIDEOCAP_SEN_NAME_LEN-1, "nvt_sen_imx307");
+	printf("Using nvt_sen_imx307\n");
 	#elif (RESOLUTION_SET == 1)
 	snprintf(cap_cfg.sen_cfg.sen_dev.driver_name, HD_VIDEOCAP_SEN_NAME_LEN-1, "nvt_sen_os05a10");
 	printf("Using nvt_sen_os05a10\n");
@@ -214,8 +217,10 @@ static HD_RESULT set_cap_cfg(HD_PATH_ID *p_video_cap_ctrl)
 		printf("Using g_shdr_mode\n");
 	} else {
 		#if (RESOLUTION_SET == 0)
-		printf("Using imx290\n");
-		cap_cfg.sen_cfg.sen_dev.pin_cfg.pinmux.serial_if_pinmux = 0xf01;//0xf01;//PIN_MIPI_LVDS_CFG_CLK2 | PIN_MIPI_LVDS_CFG_DAT0 | PIN_MIPI_LVDS_CFG_DAT1 | PIN_MIPI_LVDS_CFG_DAT2 | PIN_MIPI_LVDS_CFG_DAT3
+		/* ooSSoo */
+		printf("Using imx307\n");
+		//cap_cfg.sen_cfg.sen_dev.pin_cfg.pinmux.serial_if_pinmux = 0xf01;//0xf01;//PIN_MIPI_LVDS_CFG_CLK2 | PIN_MIPI_LVDS_CFG_DAT0 | PIN_MIPI_LVDS_CFG_DAT1 | PIN_MIPI_LVDS_CFG_DAT2 | PIN_MIPI_LVDS_CFG_DAT3
+		cap_cfg.sen_cfg.sen_dev.pin_cfg.pinmux.serial_if_pinmux = 0x301;//PIN_MIPI_LVDS_CFG_CLK2 | PIN_MIPI_LVDS_CFG_DAT0|PIN_MIPI_LVDS_CFG_DAT1 | PIN_MIPI_LVDS_CFG_DAT2 | PIN_MIPI_LVDS_CFG_DAT3
 		#elif (RESOLUTION_SET == 1)
 		printf("Using OS052A\n");
 		cap_cfg.sen_cfg.sen_dev.pin_cfg.pinmux.serial_if_pinmux = 0xf01;//0xf01;//PIN_MIPI_LVDS_CFG_CLK2 | PIN_MIPI_LVDS_CFG_DAT0 | PIN_MIPI_LVDS_CFG_DAT1 | PIN_MIPI_LVDS_CFG_DAT2 | PIN_MIPI_LVDS_CFG_DAT3
@@ -237,8 +242,9 @@ static HD_RESULT set_cap_cfg(HD_PATH_ID *p_video_cap_ctrl)
 		cap_cfg.sen_cfg.sen_dev.pin_cfg.sen_2_serial_pin_map[3] = 3;
 	} else {
 		#if (RESOLUTION_SET == 0)
-			cap_cfg.sen_cfg.sen_dev.pin_cfg.sen_2_serial_pin_map[2] = 2;
-			cap_cfg.sen_cfg.sen_dev.pin_cfg.sen_2_serial_pin_map[3] = 3;
+			/* ooSSoo */
+			cap_cfg.sen_cfg.sen_dev.pin_cfg.sen_2_serial_pin_map[2] = HD_VIDEOCAP_SEN_IGNORE;
+			cap_cfg.sen_cfg.sen_dev.pin_cfg.sen_2_serial_pin_map[3] = HD_VIDEOCAP_SEN_IGNORE;
 		#elif (RESOLUTION_SET == 1)
 			printf("Using OS052A or shdr\n");
 			cap_cfg.sen_cfg.sen_dev.pin_cfg.sen_2_serial_pin_map[2] = 2;
@@ -280,8 +286,8 @@ static HD_RESULT set_cap_param(HD_PATH_ID video_cap_path, HD_DIM *p_dim, BOOL is
 	HD_RESULT ret = HD_OK;
 	{//select sensor mode, manually or automatically
 		HD_VIDEOCAP_IN video_in_param = {0};
-
-		video_in_param.sen_mode = HD_VIDEOCAP_SEN_MODE_AUTO; //auto select sensor mode by the parameter of HD_VIDEOCAP_PARAM_OUT
+		/* ooSSoo */
+		video_in_param.sen_mode = 4;
 		video_in_param.frc = HD_VIDEO_FRC_RATIO(30,1);
 		video_in_param.dim.w = p_dim->w;
 		video_in_param.dim.h = p_dim->h;
