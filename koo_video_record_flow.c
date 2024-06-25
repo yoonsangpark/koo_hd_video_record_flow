@@ -676,7 +676,7 @@ static int set_mask_param(HD_PATH_ID mask_path)
 	attr.position[3].x = 500;
 	attr.position[3].y = 120;
 	attr.type          = HD_OSG_MASK_TYPE_SOLID;
-	attr.alpha         = 255;
+	attr.alpha         = 150;
 	attr.color         = 0x00FF0000;
 
 	return hd_videoout_set(mask_path, HD_VIDEOOUT_PARAM_OUT_MASK_ATTR, &attr);
