@@ -46,6 +46,8 @@
 #define DBGH(x)			printf("\033[0;35m%s=0x%08X\033[0m\r\n", #x, x)
 #define DBGD(x)			printf("\033[0;35m%s=%d\033[0m\r\n", #x, x)
 
+//ooSSoo
+#define KOO_OSM 		1
 
 #define RESOLUTION_SET  	0 //0: 2M(IMX290), 1:5M(OS05A) 2: 2M (OS02K10) 3: 2M (AR0237IR)
 
@@ -658,6 +660,29 @@ static HD_RESULT set_enc_param(HD_PATH_ID video_enc_path, HD_DIM *p_dim, UINT32 
 	return ret;
 }
 
+#ifdef KOO_OSM
+static int set_mask_param(HD_PATH_ID mask_path)
+{
+	HD_OSG_MASK_ATTR attr;
+
+	memset(&attr, 0, sizeof(HD_OSG_MASK_ATTR));
+
+	attr.position[0].x = 500;
+	attr.position[0].y = 0;
+	attr.position[1].x = 600;
+	attr.position[1].y = 0;
+	attr.position[2].x = 600;
+	attr.position[2].y = 120;
+	attr.position[3].x = 500;
+	attr.position[3].y = 120;
+	attr.type          = HD_OSG_MASK_TYPE_SOLID;
+	attr.alpha         = 255;
+	attr.color         = 0x00FF0000;
+
+	return hd_videoout_set(mask_path, HD_VIDEOOUT_PARAM_OUT_MASK_ATTR, &attr);
+}
+#endif /* KOO_OSM */
+
 ///////////////////////////////////////////////////////////////////////////////
 
 typedef struct _VIDEO_RECORD_SIZE {
@@ -716,7 +741,9 @@ typedef struct _VIDEO_LIVEVIEW {
 	HD_VIDEOOUT_SYSCAPS out_syscaps;
 	HD_PATH_ID out_ctrl;
 	HD_PATH_ID out_path;
-    HD_VIDEOOUT_HDMI_ID hdmi_id;
+	HD_VIDEOOUT_HDMI_ID hdmi_id;
+
+	HD_PATH_ID mask_path; /* KOO_OSM */
 
 	HD_DIM  out1_max_dim;
 	HD_DIM  out1_dim;
@@ -810,6 +837,12 @@ static HD_RESULT open_module(VIDEO_LIVEVIEW *p_stream, HD_DIM* p_proc_max_dim, H
 	if ((ret = hd_videoout_open(HD_VIDEOOUT_0_IN_0, HD_VIDEOOUT_0_OUT_0, &p_stream->out_path)) != HD_OK)
 		return ret;
 
+#ifdef KOO_OSM
+	//open a mask in videoout
+	if((ret = hd_videoout_open(HD_VIDEOOUT_0_IN_0, HD_MASK_0, &p_stream->mask_path)) != HD_OK)
+		return ret;
+#endif /* KOO_OSM */
+
 	return HD_OK;
 }
 
@@ -833,6 +866,12 @@ static HD_RESULT close_module(VIDEO_LIVEVIEW *p_stream)
 		return ret;
 	if ((ret = hd_videoout_close(p_stream->out_path)) != HD_OK)
 		return ret;
+
+#ifdef KOO_OSM
+	if((ret = hd_videoout_close(p_stream->mask_path)) != HD_OK)
+		return ret;
+#endif /* KOO_OSM */
+
 	return HD_OK;
 }
 
@@ -1203,6 +1242,21 @@ MAIN(argc, argv)
 		printf("open fail=%d\n", ret);
 		goto exit;
 	}
+
+#ifdef KOO_OSM
+	//setup mask parameter
+	if(set_mask_param(stream[0].mask_path)){
+		printf("fail to set vo mask\r\n");
+		goto exit;
+	}
+
+	//render mask
+	ret = hd_videoout_start(stream[0].mask_path);
+	if (ret != HD_OK) {
+		printf("fail to start vo mask\n");
+		goto exit;
+	}
+#endif /* KOO_OSM */
 
 	// open video_record modules (record)
 	stream2[0].proc_max_dim.w = REC_SIZE_W; //assign by user
