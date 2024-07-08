@@ -913,8 +913,9 @@ static void *save_thread(void *arg)
 
 	UINT32 vir_addr_main;
 	HD_VIDEOENC_BUFINFO phy_buf_main;
-	char file_path_main[64] = {0};
+	char file_path_main[256], file_path_len[256];
 	FILE *f_out_main;
+	FILE *f_out_len = NULL;
 	#define PHY2VIRT_MAIN(pa) (vir_addr_main + (pa - phy_buf_main.buf_info.phy_addr))
 
 	p_stream0->save_exit = 0;
@@ -935,14 +936,17 @@ static void *save_thread(void *arg)
 		snprintf(file_path_main, 64, "/mnt/sd/rec_%lux%lu_%lu_h265.mp4",
 			p_stream0->record_dim.w, p_stream0->record_dim.h,
 			p_stream0->save_count+1);
+		snprintf(file_path_len, 256, "/mnt/sd/video_bs_%d_%d_h265.len", VDO_SIZE_W, VDO_SIZE_H);
 	} else if (p_stream0->enc_type == 1) {
 		snprintf(file_path_main, 64, "/mnt/sd/rec_%lux%lu_%lu_h264.mp4",
 			p_stream0->record_dim.w, p_stream0->record_dim.h,
 			p_stream0->save_count+1);
+		snprintf(file_path_len, 256, "/mnt/sd/video_bs_%d_%d_h264.len", VDO_SIZE_W, VDO_SIZE_H);
 	} else if (p_stream0->enc_type == 2) {
 		snprintf(file_path_main, 64, "/mnt/sd/rec_%lux%lu_%lu_mjpg.mp4",
 			p_stream0->record_dim.w, p_stream0->record_dim.h,
 			p_stream0->save_count+1);
+		snprintf(file_path_len, 256, "/mnt/sd/video_bs_%d_%d_jpeg.len", VDO_SIZE_W, VDO_SIZE_H);
 	} else {
 		printf("not support enc_type\r\n");
 		return 0;
@@ -954,11 +958,15 @@ static void *save_thread(void *arg)
 		HD_VIDEOENC_ERR("open file (%s) fail....\r\n\r\n", file_path_main);
 			goto skip3;
 	}
-
+	if ((f_out_len = fopen(file_path_len, "wb")) == NULL) {
+		printf("open len file (%s) fail....\r\n", file_path_len);
+	}
 	//--------- pull data test ---------
 	while (p_stream0->save_exit == 0) {
 
 		//printf("enc_pull ....\r\n");
+		UINT32 bs_sum = 0;
+
 		ret = hd_videoenc_pull_out_buf(p_stream0->enc_path, &data_pull, -1); // -1 = blocking mode
 		if (ret != HD_OK) {
 			if (ret != HD_ERR_UNDERRUN)
@@ -971,6 +979,16 @@ static void *save_thread(void *arg)
 			UINT32 len = data_pull.video_pack[j].size;
 			if (f_out_main) fwrite(ptr, 1, len, f_out_main);
 			if (f_out_main) fflush(f_out_main);
+
+			// write bs len
+			if (j == data_pull.pack_num - 1 && data_pull.pack_num > 1) {
+				if (f_out_len) fprintf(f_out_len, "%d\n", bs_sum);
+				if (f_out_len) fflush(f_out_len);	
+			}
+			if (j == data_pull.pack_num - 1) {
+				if (f_out_len) fprintf(f_out_len, "%d\n", len);
+				if (f_out_len) fflush(f_out_len);
+			}
 		}
 
 		//printf("enc_release ....\r\n");
@@ -995,7 +1013,7 @@ skip3:
 
 	// close output file
 	fclose(f_out_main);
-
+	fclose(f_out_len);
 	printf("ok\r\n");
 
 	p_stream0->save_count++;
