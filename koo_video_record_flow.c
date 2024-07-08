@@ -933,20 +933,20 @@ static void *save_thread(void *arg)
 	}
 
 	if (p_stream0->enc_type == 0) {
-		snprintf(file_path_main, 64, "/mnt/sd/rec_%lux%lu_%lu_h265.mp4",
+		snprintf(file_path_main, 64, "/mnt/sd/rec_%lu_%lu_%lu_h265.mp4",
 			p_stream0->record_dim.w, p_stream0->record_dim.h,
 			p_stream0->save_count+1);
-		snprintf(file_path_len, 256, "/mnt/sd/video_bs_%d_%d_h265.len", VDO_SIZE_W, VDO_SIZE_H);
+		snprintf(file_path_len, 256, "/mnt/sd/rec_%d_%d_%lu_h265.len", VDO_SIZE_W, VDO_SIZE_H, p_stream0->save_count+1);
 	} else if (p_stream0->enc_type == 1) {
-		snprintf(file_path_main, 64, "/mnt/sd/rec_%lux%lu_%lu_h264.mp4",
+		snprintf(file_path_main, 64, "/mnt/sd/rec_%lu_%lu_%lu_h264.mp4",
 			p_stream0->record_dim.w, p_stream0->record_dim.h,
 			p_stream0->save_count+1);
-		snprintf(file_path_len, 256, "/mnt/sd/video_bs_%d_%d_h264.len", VDO_SIZE_W, VDO_SIZE_H);
+		snprintf(file_path_len, 256, "/mnt/sd/rec_%d_%d_%lu_h264.len", VDO_SIZE_W, VDO_SIZE_H, p_stream0->save_count+1);
 	} else if (p_stream0->enc_type == 2) {
-		snprintf(file_path_main, 64, "/mnt/sd/rec_%lux%lu_%lu_mjpg.mp4",
+		snprintf(file_path_main, 64, "/mnt/sd/rec_%lu_%lu_%lu_mjpg.mp4",
 			p_stream0->record_dim.w, p_stream0->record_dim.h,
 			p_stream0->save_count+1);
-		snprintf(file_path_len, 256, "/mnt/sd/video_bs_%d_%d_jpeg.len", VDO_SIZE_W, VDO_SIZE_H);
+		snprintf(file_path_len, 256, "/mnt/sd/rec_%d_%d_%lu_jpeg.len", VDO_SIZE_W, VDO_SIZE_H, p_stream0->save_count+1);
 	} else {
 		printf("not support enc_type\r\n");
 		return 0;
