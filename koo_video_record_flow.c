@@ -966,35 +966,38 @@ static void *save_thread(void *arg)
 
 		//printf("enc_pull ....\r\n");
 		UINT32 bs_sum = 0;
-
+		//pull data
 		ret = hd_videoenc_pull_out_buf(p_stream0->enc_path, &data_pull, -1); // -1 = blocking mode
-		if (ret != HD_OK) {
-			if (ret != HD_ERR_UNDERRUN)
-			printf("enc_pull error=%d !!\r\n\r\n", ret);
-    			goto skip3;
-		}
 
-		for (j=0; j< data_pull.pack_num; j++) {
-			UINT8 *ptr = (UINT8 *)PHY2VIRT_MAIN(data_pull.video_pack[j].phy_addr);
-			UINT32 len = data_pull.video_pack[j].size;
-			if (f_out_main) fwrite(ptr, 1, len, f_out_main);
-			if (f_out_main) fflush(f_out_main);
+		if (ret == HD_OK) {
+			for (j=0; j< data_pull.pack_num; j++) {
+				UINT8 *ptr = (UINT8 *)PHY2VIRT_MAIN(data_pull.video_pack[j].phy_addr);
+				UINT32 len = data_pull.video_pack[j].size;
 
-			// write bs len
-			if (j == data_pull.pack_num - 1 && data_pull.pack_num > 1) {
-				if (f_out_len) fprintf(f_out_len, "%d\n", bs_sum);
-				if (f_out_len) fflush(f_out_len);	
+				if (j < data_pull.pack_num - 1) {
+					bs_sum += len;
+				}
+
+				// write bs data
+				if (f_out_main) fwrite(ptr, 1, len, f_out_main);
+				if (f_out_main) fflush(f_out_main);
+
+				// write bs len
+				if (j == data_pull.pack_num - 1 && data_pull.pack_num > 1) {
+					if (f_out_len) fprintf(f_out_len, "%d\n", bs_sum);
+					if (f_out_len) fflush(f_out_len);	
+				}
+				if (j == data_pull.pack_num - 1) {
+					if (f_out_len) fprintf(f_out_len, "%d\n", len);
+					if (f_out_len) fflush(f_out_len);
+				}
 			}
-			if (j == data_pull.pack_num - 1) {
-				if (f_out_len) fprintf(f_out_len, "%d\n", len);
-				if (f_out_len) fflush(f_out_len);
-			}
-		}
 
-		//printf("enc_release ....\r\n");
-		ret = hd_videoenc_release_out_buf(p_stream0->enc_path, &data_pull);
-		if (ret != HD_OK) {
-			printf("enc_release error=%d !!\r\n", ret);
+			// release data
+			ret = hd_videoenc_release_out_buf(p_stream0->enc_path, &data_pull);
+			if (ret != HD_OK) {
+				printf("enc_release error=%d !!\r\n", ret);
+			}
 		}
 
 		if ((p_stream0->flow_run == FLOW_ON_STOP)) {
