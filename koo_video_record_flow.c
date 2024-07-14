@@ -374,7 +374,7 @@ static HD_RESULT set_out_cfg(HD_CTRL_ID ctrl_id,HD_PATH_ID *p_video_out_ctrl, UI
 static HD_RESULT get_out_caps(HD_PATH_ID video_out_ctrl,HD_VIDEOOUT_SYSCAPS *p_video_out_syscaps)
 {
 	HD_RESULT ret = HD_OK;
-    HD_DEVCOUNT video_out_dev = {0};
+	HD_DEVCOUNT video_out_dev = {0};
 
 	ret = hd_videoout_get(video_out_ctrl, HD_VIDEOOUT_PARAM_DEVCOUNT, &video_out_dev);
 	if (ret != HD_OK) {
@@ -923,7 +923,7 @@ static void *flow_thread(void *arg)
 
 		if (p_stream2->flow_run == FLOW_ON_OPEN) {
 			HD_RESULT ret;
-            p_stream2->flow_state = FLOW_ON_OPEN;
+			p_stream2->flow_state = FLOW_ON_OPEN;
 			// get videocap capability
 			ret = get_cap_caps(p_stream0->cap_ctrl, &p_stream0->cap_syscaps);
 			if (ret != HD_OK) {
@@ -976,7 +976,7 @@ static void *flow_thread(void *arg)
 			hd_videoout_start(p_stream0->out_path);
 		}
 		if (p_stream2->flow_run == FLOW_ON_CLOSE) {
-            p_stream2->flow_state = FLOW_ON_CLOSE;
+			p_stream2->flow_state = FLOW_ON_CLOSE;
 			// stop video_liveview modules (liveview)
 			hd_videocap_stop(p_stream0->cap_path);
 			hd_videoproc_stop(p_stream0->proc_path);
@@ -988,7 +988,7 @@ static void *flow_thread(void *arg)
 		}
 		if (p_stream2->flow_run == FLOW_ON_REC) {
 			HD_RESULT ret = HD_OK;
-            p_stream2->flow_state = FLOW_ON_REC;
+			p_stream2->flow_state = FLOW_ON_REC;
 			//printf("stop liveview - begin\n");
 			hd_videocap_stop(p_stream0->cap_path);
 			hd_videoproc_stop(p_stream0->proc_path);
@@ -1056,7 +1056,7 @@ static void *flow_thread(void *arg)
 			// destroy save thread
 			pthread_join(p_stream2->save_thread_id, NULL);
 			printf("stop record.\r\n");
-            p_stream2->flow_state = FLOW_ON_STOP;
+			p_stream2->flow_state = FLOW_ON_STOP;
 			//printf("stop record - begin\n");
 			p_stream2->save_enter = 0;
 			hd_videocap_stop(p_stream2->cap_path);
@@ -1095,32 +1095,14 @@ exit2:
 MAIN(argc, argv)
 {
 	HD_RESULT ret;
-	INT key;
 	VIDEO_LIVEVIEW stream[1] = {0}; //0: liveview stream
 	VIDEO_RECORD stream2[1] = {0}; //0: record stream
 	UINT32 stream_list[2] = {((UINT32)&stream[0]), ((UINT32)&stream2[0])};
 	UINT32 out_type = 1;
 	UINT32 enc_type = 0;
 
-	// query program options
-	if (argc >= 2) {
-		out_type = atoi(argv[1]);
-		printf("out_type %d\r\n", out_type);
-		if(out_type > 2) {
-			printf("error: not support out_type!\r\n");
-			return 0;
-		}
-	}
-    stream[0].hdmi_id=HD_VIDEOOUT_HDMI_1920X1080I60;//default
-	if (argc >= 3) {
-		enc_type = atoi(argv[2]);
-		printf("enc_type %d\r\n", enc_type);
-		if(enc_type > 2) {
-			printf("error: not support enc_type!\r\n");
-			return 0;
-		}
-	}
-    stream2[0].enc_type = enc_type;
+	stream[0].hdmi_id=HD_VIDEOOUT_HDMI_1920X1080I60;//default
+	stream2[0].enc_type = enc_type;
 
 	// init hdal
 	ret = hd_common_init(0);
@@ -1183,70 +1165,25 @@ MAIN(argc, argv)
 		goto exit;
 	}
 
-	// query user key
-	printf("Enter q to exit\n");
-	printf("\r\nif you want to record 1, enter \"s\" to trigger !!\r\n");
-
+	//1. FLOW_ON_OPEN
 	stream2[0].flow_run = FLOW_ON_OPEN;
 	while (stream2[0].flow_run != 0) usleep(100); //wait unitl flow idle
 
 	stream2[0].save_count = 0;
 
-	while (1) {
-		key = GETCHAR();
-		if (key == '0') {
-			printf("select CODEC type: h265 !!\r\n");
-            stream2[0].enc_type = 0;
-		}
-		if (key == '1') {
-			printf("select CODEC type: h264 !!\r\n");
-            stream2[0].enc_type = 1;
-		}
-		if (key == '2') {
-			printf("select CODEC type: mjpg !!\r\n");
-            stream2[0].enc_type = 2;
-		}
+	//2. FLOW_ON_REC
+	stream2[0].flow_run = FLOW_ON_REC; //start record
+	while (stream2[0].flow_state != FLOW_ON_REC) usleep(100); //wait unitl flow record
 
-		if (key == 'x') {
-			printf("select SIZE 0: %lux%lu !!\r\n", rec_size[0].w, rec_size[0].h);
-			stream2[0].sel_rec_size = 0;
-		}
-		if (key == 'y') {
-			printf("select SIZE 1: %lux%lu !!\r\n", rec_size[1].w, rec_size[1].h);
-			stream2[0].sel_rec_size = 1;
-		}
-		if (key == 'z') {
-			printf("select SIZE 2: %lux%lu !!\r\n", rec_size[2].w, rec_size[2].h);
-			stream2[0].sel_rec_size = 2;
-		}
+	//Recording...
+	sleep(3);
 
-		if (key == 's') {
-			if (stream2[0].flow_run == 0) { //flow is idle
-				stream2[0].flow_run = FLOW_ON_REC; //start record
-	            while (stream2[0].flow_state != FLOW_ON_REC) usleep(100); //wait unitl flow record
-			} else { //flow is still under record
-				stream2[0].flow_run = FLOW_ON_STOP; //stop record
-	            while (stream2[0].flow_state != FLOW_ON_STOP) usleep(100); //wait unitl flow stop
-	            while (stream2[0].flow_run != 0) usleep(100); //wait unitl flow idle
-			}
-		}
-		if (key == 'q' || key == 0x3) {
-			// quit thread
-			if((stream2[0].flow_state == FLOW_ON_STOP)||(stream2[0].flow_state == FLOW_ON_OPEN)){
-    			break;
-            } else{
-                printf("stop record first\r\n");
-            }
-		}
+	//3. FLOW_ON_STOP
+	stream2[0].flow_run = FLOW_ON_STOP; //stop record
+	while (stream2[0].flow_state != FLOW_ON_STOP) usleep(100); //wait unitl flow stop
+	while (stream2[0].flow_run != 0) usleep(100); //wait unitl flow idle
 
-		#if (DEBUG_MENU == 1)
-		if (key == 'd') {
-			// enter debug menu
-			hd_debug_run_menu();
-			printf("\r\nEnter q to exit, Enter d to debug\r\n");
-		}
-		#endif
-	}
+	//4. FLOW_ON_CLOSE
 	while (stream2[0].flow_run != 0) usleep(100); //wait unitl flow idle
 	stream2[0].flow_run = FLOW_ON_CLOSE;
 	while (stream2[0].flow_state != FLOW_ON_CLOSE) usleep(100); //wait unitl flow idle
