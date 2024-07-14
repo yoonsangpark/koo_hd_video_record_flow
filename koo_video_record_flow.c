@@ -48,10 +48,7 @@
 
 //ooSSoo
 #define KOO_OSM 		1
-
-#define RESOLUTION_SET  	0 //0: 2M(IMX290), 1:5M(OS05A) 2: 2M (OS02K10) 3: 2M (AR0237IR)
-
-#define MOVIE_BRC_MODE      0 //1: Movie BRC mode , 0: fix quality mode
+#define MOVIE_BRC_MODE  	0 //1: Movie BRC mode , 0: fix quality mode
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -91,39 +88,17 @@
 #define ETH_8BIT_SEL		0 //0: 2bit out, 1:8 bit out
 #define ETH_OUT_SEL		1 //0: full, 1: subsample 1/2
 
-#if ( RESOLUTION_SET == 0)
 #define VDO_SIZE_W      	1920
 #define VDO_SIZE_H      	1080
-#elif (RESOLUTION_SET == 1)
-#define VDO_SIZE_W      	1920
-#define VDO_SIZE_H      	1080
-#elif ( RESOLUTION_SET == 2)
-#define VDO_SIZE_W      	1920
-#define VDO_SIZE_H      	1080
-#elif ( RESOLUTION_SET == 3)
-#define VDO_SIZE_W      	1920
-#define VDO_SIZE_H      	1080
-#endif
-
-#if ( RESOLUTION_SET == 0)
 #define REC_SIZE_W		1920
 #define REC_SIZE_H		1080
-#elif (RESOLUTION_SET == 1)
-#define REC_SIZE_W		2592
-#define REC_SIZE_H		1944
-#elif ( RESOLUTION_SET == 2)
-#define REC_SIZE_W		1920
-#define REC_SIZE_H		1080
-#elif ( RESOLUTION_SET == 3)
-#define REC_SIZE_W		1920
-#define REC_SIZE_H		1080
-#endif
 
 #if MOVIE_BRC_MODE
 #define REC_TBR			(2 * 1024 * 1024) //bits-per-sec
 #else
 #define REC_TBR			(((3840 * 2160 * 3/2) /5) * 8) //fix-quality 70, assume compress ratio = 1/5, for max resolution 3840x2160
 #endif
+
 #define REC_FIX_TBR(w,h)	((((w) * (h) * 3/2) /5) * 8) //fix-quality 70, assume compress ratio = 1/5, for max resolution w x h
 #define REC_BUF			10000 //ms
 
@@ -186,51 +161,13 @@ static HD_RESULT set_cap_cfg(HD_PATH_ID *p_video_cap_ctrl)
 	HD_VIDEOCAP_CTRL iq_ctl = {0};
 	char *chip_name = getenv("NVT_CHIP_ID");
 
-    #if (RESOLUTION_SET == 0)
-	/* ooSSoo */
 	//snprintf(cap_cfg.sen_cfg.sen_dev.driver_name, HD_VIDEOCAP_SEN_NAME_LEN-1, "nvt_sen_imx290");
-	//printf("Using nvt_sen_imx290\n");
-	snprintf(cap_cfg.sen_cfg.sen_dev.driver_name, HD_VIDEOCAP_SEN_NAME_LEN-1, "nvt_sen_imx307");
-	printf("Using nvt_sen_imx307\n");
-	#elif (RESOLUTION_SET == 1)
-	snprintf(cap_cfg.sen_cfg.sen_dev.driver_name, HD_VIDEOCAP_SEN_NAME_LEN-1, "nvt_sen_os05a10");
-	printf("Using nvt_sen_os05a10\n");
-	#elif (RESOLUTION_SET == 2)
-	snprintf(cap_cfg.sen_cfg.sen_dev.driver_name, HD_VIDEOCAP_SEN_NAME_LEN-1, "nvt_sen_os02k10");
-	printf("Using nvt_sen_os02k10\n");
-	#elif (RESOLUTION_SET == 3)
-	snprintf(cap_cfg.sen_cfg.sen_dev.driver_name, HD_VIDEOCAP_SEN_NAME_LEN-1, "nvt_sen_ar0237ir");
-	printf("Using nvt_sen_ar0237ir\n");
-	#endif
-
-
-    if(RESOLUTION_SET == 3){
-        cap_cfg.sen_cfg.sen_dev.if_type = HD_COMMON_VIDEO_IN_P_RAW;
-	    cap_cfg.sen_cfg.sen_dev.pin_cfg.pinmux.sensor_pinmux =  0x204; //PIN_SENSOR_CFG_MIPI | PIN_SENSOR_CFG_MCLK
-	    printf("Parallel interface\n");
-    }
-    if(RESOLUTION_SET == 0 || RESOLUTION_SET == 1 || RESOLUTION_SET == 2){
-	    cap_cfg.sen_cfg.sen_dev.if_type = HD_COMMON_VIDEO_IN_MIPI_CSI;
-	    cap_cfg.sen_cfg.sen_dev.pin_cfg.pinmux.sensor_pinmux =  0x220; //PIN_SENSOR_CFG_MIPI
-	    printf("MIPI interface\n");
-    }
-	if (g_shdr_mode == 1) {
-		cap_cfg.sen_cfg.sen_dev.pin_cfg.pinmux.serial_if_pinmux = 0xf01;//PIN_MIPI_LVDS_CFG_CLK2 | PIN_MIPI_LVDS_CFG_DAT0 | PIN_MIPI_LVDS_CFG_DAT1 | PIN_MIPI_LVDS_CFG_DAT2 | PIN_MIPI_LVDS_CFG_DAT3
-		printf("Using g_shdr_mode\n");
-	} else {
-		#if (RESOLUTION_SET == 0)
-		/* ooSSoo */
-		printf("Using imx307\n");
-		//cap_cfg.sen_cfg.sen_dev.pin_cfg.pinmux.serial_if_pinmux = 0xf01;//0xf01;//PIN_MIPI_LVDS_CFG_CLK2 | PIN_MIPI_LVDS_CFG_DAT0 | PIN_MIPI_LVDS_CFG_DAT1 | PIN_MIPI_LVDS_CFG_DAT2 | PIN_MIPI_LVDS_CFG_DAT3
-		cap_cfg.sen_cfg.sen_dev.pin_cfg.pinmux.serial_if_pinmux = 0x301;//PIN_MIPI_LVDS_CFG_CLK2 | PIN_MIPI_LVDS_CFG_DAT0|PIN_MIPI_LVDS_CFG_DAT1 | PIN_MIPI_LVDS_CFG_DAT2 | PIN_MIPI_LVDS_CFG_DAT3
-		#elif (RESOLUTION_SET == 1)
-		printf("Using OS052A\n");
-		cap_cfg.sen_cfg.sen_dev.pin_cfg.pinmux.serial_if_pinmux = 0xf01;//0xf01;//PIN_MIPI_LVDS_CFG_CLK2 | PIN_MIPI_LVDS_CFG_DAT0 | PIN_MIPI_LVDS_CFG_DAT1 | PIN_MIPI_LVDS_CFG_DAT2 | PIN_MIPI_LVDS_CFG_DAT3
-		#elif (RESOLUTION_SET == 2)
-		printf("Using OS02K10\n");
-		cap_cfg.sen_cfg.sen_dev.pin_cfg.pinmux.serial_if_pinmux = 0xf01;//0xf01;//PIN_MIPI_LVDS_CFG_CLK2 | PIN_MIPI_LVDS_CFG_DAT0 | PIN_MIPI_LVDS_CFG_DAT1 | PIN_MIPI_LVDS_CFG_DAT2 | PIN_MIPI_LVDS_CFG_DAT3
-		#endif
-	}
+	//snprintf(cap_cfg.sen_cfg.sen_dev.driver_name, HD_VIDEOCAP_SEN_NAME_LEN-1, "nvt_sen_gc5603");
+	snprintf(cap_cfg.sen_cfg.sen_dev.driver_name, HD_VIDEOCAP_SEN_NAME_LEN-1, "nvt_sen_imx307");  /* ooSSoo */
+	
+	cap_cfg.sen_cfg.sen_dev.if_type = HD_COMMON_VIDEO_IN_MIPI_CSI;
+	cap_cfg.sen_cfg.sen_dev.pin_cfg.pinmux.sensor_pinmux =  0x220; //PIN_SENSOR_CFG_MIPI | PIN_SENSOR_CFG_MCLK
+	cap_cfg.sen_cfg.sen_dev.pin_cfg.pinmux.serial_if_pinmux = 0x301;//PIN_MIPI_LVDS_CFG_CLK2 | PIN_MIPI_LVDS_CFG_DAT0|PIN_MIPI_LVDS_CFG_DAT1 | PIN_MIPI_LVDS_CFG_DAT2 | PIN_MIPI_LVDS_CFG_DAT3   /* ooSSoo */
 	if (chip_name != NULL && strcmp(chip_name, "CHIP_NA51089") == 0) {
 		cap_cfg.sen_cfg.sen_dev.pin_cfg.pinmux.cmd_if_pinmux = 0x01;//PIN_I2C_CFG_CH1
 	} else {
@@ -239,44 +176,18 @@ static HD_RESULT set_cap_cfg(HD_PATH_ID *p_video_cap_ctrl)
 	cap_cfg.sen_cfg.sen_dev.pin_cfg.clk_lane_sel = HD_VIDEOCAP_SEN_CLANE_SEL_CSI0_USE_C0;
 	cap_cfg.sen_cfg.sen_dev.pin_cfg.sen_2_serial_pin_map[0] = 0;
 	cap_cfg.sen_cfg.sen_dev.pin_cfg.sen_2_serial_pin_map[1] = 1;
-	if (g_shdr_mode == 1) {
-		cap_cfg.sen_cfg.sen_dev.pin_cfg.sen_2_serial_pin_map[2] = 2;
-		cap_cfg.sen_cfg.sen_dev.pin_cfg.sen_2_serial_pin_map[3] = 3;
-	} else {
-		#if (RESOLUTION_SET == 0)
-			/* ooSSoo */
-			cap_cfg.sen_cfg.sen_dev.pin_cfg.sen_2_serial_pin_map[2] = HD_VIDEOCAP_SEN_IGNORE;
-			cap_cfg.sen_cfg.sen_dev.pin_cfg.sen_2_serial_pin_map[3] = HD_VIDEOCAP_SEN_IGNORE;
-		#elif (RESOLUTION_SET == 1)
-			printf("Using OS052A or shdr\n");
-			cap_cfg.sen_cfg.sen_dev.pin_cfg.sen_2_serial_pin_map[2] = 2;
-			cap_cfg.sen_cfg.sen_dev.pin_cfg.sen_2_serial_pin_map[3] = 3;
-		#elif (RESOLUTION_SET == 2)
-			printf("Using OS02K10 or shdr\n");
-			cap_cfg.sen_cfg.sen_dev.pin_cfg.sen_2_serial_pin_map[2] = 2;
-			cap_cfg.sen_cfg.sen_dev.pin_cfg.sen_2_serial_pin_map[3] = 3;
-		#endif
-	}
+	cap_cfg.sen_cfg.sen_dev.pin_cfg.sen_2_serial_pin_map[2] = HD_VIDEOCAP_SEN_IGNORE; /* ooSSoo */
+	cap_cfg.sen_cfg.sen_dev.pin_cfg.sen_2_serial_pin_map[3] = HD_VIDEOCAP_SEN_IGNORE;
 	cap_cfg.sen_cfg.sen_dev.pin_cfg.sen_2_serial_pin_map[4] = HD_VIDEOCAP_SEN_IGNORE;
 	cap_cfg.sen_cfg.sen_dev.pin_cfg.sen_2_serial_pin_map[5] = HD_VIDEOCAP_SEN_IGNORE;
 	cap_cfg.sen_cfg.sen_dev.pin_cfg.sen_2_serial_pin_map[6] = HD_VIDEOCAP_SEN_IGNORE;
 	cap_cfg.sen_cfg.sen_dev.pin_cfg.sen_2_serial_pin_map[7] = HD_VIDEOCAP_SEN_IGNORE;
 	ret = hd_videocap_open(0, HD_VIDEOCAP_0_CTRL, &video_cap_ctrl); //open this for device control
-
 	if (ret != HD_OK) {
 		return ret;
 	}
-
-	if (g_shdr_mode == 1) {
-		cap_cfg.sen_cfg.shdr_map = HD_VIDEOCAP_SHDR_MAP(HD_VIDEOCAP_HDR_SENSOR1, (HD_VIDEOCAP_0|HD_VIDEOCAP_1));
-	}
-
 	ret |= hd_videocap_set(video_cap_ctrl, HD_VIDEOCAP_PARAM_DRV_CONFIG, &cap_cfg);
 	iq_ctl.func = VCAP_ALG_FUNC;
-
-	if (g_shdr_mode == 1) {
-		iq_ctl.func |= HD_VIDEOCAP_FUNC_SHDR;
-	}
 	ret |= hd_videocap_set(video_cap_ctrl, HD_VIDEOCAP_PARAM_CTRL, &iq_ctl);
 
 	*p_video_cap_ctrl = video_cap_ctrl;
@@ -690,34 +601,11 @@ typedef struct _VIDEO_RECORD_SIZE {
 	UINT32 h;
 } VIDEO_RECORD_SIZE;
 
-#if ( RESOLUTION_SET == 0)
 VIDEO_RECORD_SIZE rec_size[3] = {
 	{1920, 1080}, //2M
 	{1280, 720},
 	{864, 480},
 };
-#elif (RESOLUTION_SET == 1)
-VIDEO_RECORD_SIZE rec_size[3] = {
-	//{2880, 2160},
-	//{2592, 1936}, //5M
-	{2592, 1944}, //5M
-	//{1920, 1440},
-	{1280, 960},
-	{640, 480},
-};
-#elif ( RESOLUTION_SET == 3)
-VIDEO_RECORD_SIZE rec_size[3] = {
-	{1920, 1080}, //2M
-	{1280, 720},
-	{864, 480},
-};
-#elif ( RESOLUTION_SET == 4)
-VIDEO_RECORD_SIZE rec_size[3] = {
-	{1920, 1080}, //2M
-	{1280, 720},
-	{864, 480},
-};
-#endif
 
 typedef struct _VIDEO_LIVEVIEW {
 
