@@ -8,7 +8,8 @@ VOS_INC_PATH = $(VOS_DRIVER_DIR)/include
 HDAL_INC_PATH = $(NVT_HDAL_DIR)/include
 HDAL_LIB_PATH = $(NVT_HDAL_DIR)/output
 # INC FLAGs
-EXTRA_INCLUDE += -I$(HDAL_INC_PATH) -I$(VOS_INC_PATH)
+INCLUDE_DIR = $(LINUX_BUILD_TOP)/code/lib/include
+EXTRA_INCLUDE += -I$(HDAL_INC_PATH) -I$(VOS_INC_PATH) -I$(INCLUDE_DIR) -I$(INCLUDE_DIR)/freetype2
 .PHONY: all clean
 ###############################################################################
 # Linux Makefile                                                              #
@@ -18,7 +19,7 @@ ifeq ($(NVT_PRJCFG_CFG),Linux)
 WARNING		= -Wall -Wundef -Wsign-compare -Wno-missing-braces -Wstrict-prototypes -Werror
 COMPILE_OPTS	=  -I. -O2 -fPIC -ffunction-sections -fdata-sections -D__LINUX
 C_CFLAGS	= $(PLATFORM_CFLAGS) $(COMPILE_OPTS) $(WARNING) $(EXTRA_INCLUDE)
-LD_FLAGS	= -L$(HDAL_LIB_PATH) -lhdal -lpthread
+LD_FLAGS	= -L$(HDAL_LIB_PATH) -L$(LIBRARY_DIR)/output -lhdal -lpthread -lfreetype -lm
 #--------- END OF ENVIRONMENT SETTING -------------
 LIB_NAME = $(MODULE_NAME)
 SRC = koo_video_record_flow.c
