@@ -20,6 +20,13 @@
 #include "hdal.h"
 #include "hd_debug.h"
 
+//ooSSoo
+#include <unistd.h>
+#include <time.h>
+#include <math.h>
+#include <ft2build.h>
+#include FT_FREETYPE_H
+
 // platform dependent
 #if defined(__LINUX)
 #include <pthread.h>			//for pthread API
@@ -48,6 +55,7 @@
 
 //ooSSoo
 #define KOO_OSM 		1
+#define KOO_OVS 		1
 #define MOVIE_BRC_MODE  	0 //1: Movie BRC mode , 0: fix quality mode
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -109,8 +117,185 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#ifdef KOO_OVS
+#define WIDTH   1000
+#define HEIGHT  100
 
+unsigned short                  dimage[HEIGHT * WIDTH];
+
+/* origin is the upper left corner */
+FT_Library                      library = NULL;
+FT_Face                         face = { 0 };
+FT_GlyphSlot                    slot;
+FT_Matrix                       matrix;                 /* transformation matrix */
+FT_Vector                       pen;                    /* untransformed origin  */
+FT_Error                        error;
+
+///////////////////////////////////////////////////////////////////////////////
+
+static int init_ftype(char *font_file, int font_size, double angle)
+{
+	FT_Error error;
+
+	if (!font_file) {
+		printf("freetyped : invalid ftype parameter\n");
+		return -1;
+	}
+
+	error = FT_Init_FreeType(&library);                /* initialize library */
+	/* error handling omitted */
+
+	error = FT_New_Face(library, font_file, 0, &face);   /* create face object */
+	if (error) {
+		printf("freetyped : FT_New_Face() fail with %d\r\n", error);
+	}
+	/* error handling omitted */
+
+	/* use 50pt at 100dpi */
+	error = FT_Set_Char_Size(face, font_size * 64, 0, 100, 0);                  /* set character size */
+	/* error handling omitted */
+	if (error) {
+		printf("freetyped : FT_Set_Char_Size() fail with %d\r\n", error);
+	}
+
+	/* set up matrix */
+	matrix.xx = (FT_Fixed)(cos(angle) * 0x10000L);
+	matrix.xy = (FT_Fixed)(-sin(angle) * 0x10000L);
+	matrix.yx = (FT_Fixed)(sin(angle) * 0x10000L);
+	matrix.yy = (FT_Fixed)(cos(angle) * 0x10000L);
+
+	return (int)error;
+}
+
+/* Replace this function with something useful. */
+static void draw_bitmap(FT_Bitmap *bitmap, FT_Int x, FT_Int y, unsigned short *buf)
+{
+	FT_Int  i, j, p, q;
+	FT_Int  x_max = x + bitmap->width;
+	FT_Int  y_max = y + bitmap->rows;
+
+	for (i = x, p = 0; i < x_max; i++, p++) {
+		for (j = y, q = 0; j < y_max; j++, q++) {
+			if (i < 0 || j < 0 || i >= WIDTH || j >= HEIGHT) {
+				continue;
+			}
+
+			if (bitmap->buffer[q * bitmap->width + p])
+				buf[j * WIDTH + i] = (((unsigned short)240 << 8) | (unsigned short)15);
+			else
+				buf[j * WIDTH + i] = 0x00;
+		}
+	}
+}
+
+static int create_datetime_image(char *prefix, unsigned short *buf)
+{
+	char                 new_date_time[50], osd_string[100];
+	int                  n, num_dt, font_size = 20, width = 0, height = 0;
+	time_t               tmp_time;
+	struct tm            *timep;
+
+	if(!buf){
+		printf("buf is null\r\n");
+		return -1;
+	}
+
+	memset(new_date_time, 0, sizeof(new_date_time));
+	time(&tmp_time);
+	timep = localtime(&tmp_time);
+	if (timep) {
+		sprintf(new_date_time, "%d/%.2d/%.2d - %.2d:%.2d:%.2d", 1900 + timep->tm_year, 1 + timep->tm_mon, timep->tm_mday, timep->tm_hour, timep->tm_min, timep->tm_sec);
+	} else {
+		printf("freetyped : localtime() fail\r\n");
+		return -1;
+	}
+
+	if(prefix){
+		if(strlen(prefix) < sizeof(osd_string))
+			strcpy(osd_string, prefix);
+		else{
+			printf("size of prefix(%d) > size of osd string(%d)\r\n", strlen(prefix), sizeof(osd_string));
+			return -1;
+		}
+	}
+
+	if((strlen(prefix) + strlen(new_date_time)) < sizeof(osd_string))
+		strcat(osd_string, new_date_time);
+	else{
+		printf("size of prefix(%d) + size of timestamp(%d) > size of osd string(%d)\r\n", strlen(prefix), strlen(new_date_time), sizeof(osd_string));
+		return -1;
+	}
+	printf("new datetime is %s\n", osd_string);
+
+	slot = face->glyph;
+
+	memset(buf, 0, WIDTH * HEIGHT * 2);
+
+	pen.x = 0;
+	pen.y = 640;
+
+	num_dt = strlen(osd_string);
+	for (n = 0; n < num_dt; n++) {
+		/* set transformation */
+		FT_Set_Transform(face, &matrix, &pen);
+
+		/* load glyph image into the slot (erase previous one) */
+		error = FT_Load_Char(face, osd_string[n], FT_LOAD_RENDER);
+		if (error) {
+			printf("FT_Load_Char(%c) fail with %d\n", osd_string[n], error);
+			return -1;
+		}
+
+		/* now, draw to our target surface (convert position) */
+		draw_bitmap(&slot->bitmap, slot->bitmap_left, HEIGHT - slot->bitmap_top, buf);
+
+		/* increment pen position */
+		pen.x += slot->advance.x;
+		pen.y += slot->advance.y;
+
+		height = slot->bitmap_top + (font_size - (slot->bitmap_top % font_size));
+		width  = slot->bitmap_left + slot->bitmap.width;
+		width  = width  + (font_size - (width % font_size));
+		width += (4 - (width % 4));
+	}
+
+	if (width > WIDTH || height > HEIGHT) {
+		printf("freetyped : image w(%d) h(%d) > max w(%d) h(%d)\r\n", width, height, WIDTH, HEIGHT);
+		return -1;
+	}
+
+	return 0;
+}
+
+static int query_osg_buf_size(void)
+{
+	HD_VIDEO_FRAME frame = {0};
+	int stamp_size;
+
+	frame.sign   = MAKEFOURCC('O','S','G','P');
+			frame.dim.w  = WIDTH;
+			frame.dim.h  = HEIGHT;
+	frame.pxlfmt = HD_VIDEO_PXLFMT_ARGB4444;
+
+	//get required buffer size for a single image
+	stamp_size = hd_common_mem_calc_buf_size(&frame);
+	if(!stamp_size){
+		printf("fail to query buffer size\n");
+		return -1;
+	}
+
+	//ping pong buffer needs double size
+	stamp_size *= 2;
+
+	return stamp_size;
+}
+#endif /* KOO_OVS */
+
+#ifdef KOO_OVS
+static HD_RESULT mem_init(UINT32 stamp_size)
+#else
 static HD_RESULT mem_init(void)
+#endif
 {
 	HD_RESULT              ret;
 	HD_COMMON_MEM_INIT_CONFIG mem_cfg = {0};
@@ -133,9 +318,52 @@ static HD_RESULT mem_init(void)
 	mem_cfg.pool_info[2].blk_cnt = 3;
 	mem_cfg.pool_info[2].ddr_id = DDR_ID0;
 
+#ifdef KOO_OVS
+	// OVS : config common pool (osg)
+	mem_cfg.pool_info[3].type = HD_COMMON_MEM_OSG_POOL;
+	mem_cfg.pool_info[3].blk_size = stamp_size;
+	mem_cfg.pool_info[3].blk_cnt = 1;
+	mem_cfg.pool_info[3].ddr_id = DDR_ID0;
+#endif /* KOO_OVS */
+
 	ret = hd_common_mem_init(&mem_cfg);
 	return ret;
 }
+
+#ifdef KOO_OVS
+static unsigned int mem_alloc(UINT32 stamp_size, UINT32 *stamp_blk, UINT32 *stamp_pa)
+{
+	UINT32                  pa;
+	HD_COMMON_MEM_VB_BLK    blk;
+
+	if(!stamp_size){
+		printf("stamp_size is unknown\n");
+		return -1;
+	}
+
+	//get osd stamps' block
+	blk = hd_common_mem_get_block(HD_COMMON_MEM_OSG_POOL, stamp_size, DDR_ID0);
+	if (blk == HD_COMMON_MEM_VB_INVALID_BLK) {
+		printf("get block fail\r\n");
+		return -1;
+	}
+
+	if(stamp_blk)
+		*stamp_blk = blk;
+
+	//translate stamp block to physical address
+	pa = hd_common_mem_blk2pa(blk);
+	if (pa == 0) {
+		printf("blk2pa fail, blk = 0x%x\r\n", blk);
+		return -1;
+	}
+
+	if(stamp_pa)
+		*stamp_pa = pa;
+
+	return 0;
+}
+#endif /* KOO_OVS */
 
 static HD_RESULT mem_exit(void)
 {
@@ -594,6 +822,68 @@ static int set_mask_param(HD_PATH_ID mask_path)
 }
 #endif /* KOO_OSM */
 
+
+#ifdef KOO_OVS
+static int set_enc_stamp_param(HD_PATH_ID stamp_path, UINT32 stamp_pa, UINT32 stamp_size, unsigned short *image)
+{
+	HD_OSG_STAMP_BUF  buf;
+	HD_OSG_STAMP_IMG  img;
+	HD_OSG_STAMP_ATTR attr;
+
+	if(!stamp_pa){
+		printf("stamp buffer is not allocated\n");
+		return -1;
+	}
+
+	memset(&buf, 0, sizeof(HD_OSG_STAMP_BUF));
+
+	buf.type      = HD_OSG_BUF_TYPE_PING_PONG;
+	buf.p_addr    = stamp_pa;
+	buf.size      = stamp_size;
+
+	if(hd_videoenc_set(stamp_path, HD_VIDEOENC_PARAM_IN_STAMP_BUF, &buf) != HD_OK){
+		printf("fail to set stamp buffer\n");
+		return -1;
+	}
+
+	memset(&img, 0, sizeof(HD_OSG_STAMP_IMG));
+
+	img.fmt        = HD_VIDEO_PXLFMT_ARGB4444;
+	img.dim.w      = WIDTH;
+	img.dim.h      = HEIGHT;
+	img.p_addr     = (UINT32)image;
+
+	if(hd_videoenc_set(stamp_path, HD_VIDEOENC_PARAM_IN_STAMP_IMG, &img) != HD_OK){
+		printf("fail to set stamp image\n");
+		return -1;
+	}
+
+	memset(&attr, 0, sizeof(HD_OSG_STAMP_ATTR));
+
+	attr.position.x = 240;
+	attr.position.y = 240;
+	attr.alpha      = 255;
+	attr.layer      = 0;
+	attr.region     = 0;
+
+	return hd_videoenc_set(stamp_path, HD_VIDEOENC_PARAM_IN_STAMP_ATTR, &attr);
+}
+
+static int update_enc_stamp(HD_PATH_ID stamp_path, unsigned short *image)
+{
+	HD_OSG_STAMP_IMG  img;
+
+	memset(&img, 0, sizeof(HD_OSG_STAMP_IMG));
+
+	img.fmt        = HD_VIDEO_PXLFMT_ARGB4444;
+	img.dim.w      = WIDTH;
+	img.dim.h      = HEIGHT;
+	img.p_addr     = (UINT32)image;
+
+	return hd_videoenc_set(stamp_path, HD_VIDEOENC_PARAM_IN_STAMP_IMG, &img);
+}
+#endif /* KOO_OVS */
+
 ///////////////////////////////////////////////////////////////////////////////
 
 typedef struct _VIDEO_RECORD_SIZE {
@@ -681,6 +971,15 @@ typedef struct _VIDEO_RECORD {
 	UINT32	flow_quit;
 	UINT32	flow_state;
 
+#ifdef KOO_OVS
+	pthread_t  update_osg_thread_id;
+	HD_PATH_ID enc_stamp_path;
+
+	UINT32 stamp_blk;
+	UINT32 stamp_pa;
+	UINT32 stamp_size;
+#endif /* KOO_OVS */
+
 } VIDEO_RECORD;
 
 static HD_RESULT init_module(void)
@@ -742,6 +1041,10 @@ static HD_RESULT open_module_2(VIDEO_RECORD *p_stream, HD_DIM* p_proc_max_dim, H
 		return ret;
 	if ((ret = hd_videoenc_open(HD_VIDEOENC_0_IN_0, HD_VIDEOENC_0_OUT_0, &p_stream->enc_path)) != HD_OK)
 		return ret;
+#ifdef KOO_OVS
+	if((ret = hd_videoenc_open(HD_VIDEOENC_0_IN_0, HD_STAMP_0, &p_stream->enc_stamp_path)) != HD_OK)
+				return ret;
+#endif /* KOO_OVS */
 	return HD_OK;
 }
 
@@ -770,6 +1073,11 @@ static HD_RESULT close_module_2(VIDEO_RECORD *p_stream)
 		return ret;
 	if ((ret = hd_videoenc_close(p_stream->enc_path)) != HD_OK)
 		return ret;
+#ifdef KOO_OVS
+	if((ret = hd_videoenc_close(p_stream->enc_stamp_path)) != HD_OK)
+		return ret;
+#endif /* KOO_OVS */
+
 	return HD_OK;
 }
 
@@ -787,8 +1095,30 @@ static HD_RESULT exit_module(void)
 	return HD_OK;
 }
 
+#ifdef KOO_OVS
+static void *update_osg_thread(void *arg){
+
+	VIDEO_RECORD* p_stream0 = (VIDEO_RECORD *)arg;
+
+	while(p_stream0->save_exit == 0) {
+		if(create_datetime_image("KOO:", (unsigned short*)dimage)){
+			printf("fail to create datetime image\n");
+			continue;
+		}
+		if(update_enc_stamp(p_stream0->enc_stamp_path, dimage)){
+			printf("fail to update datetime image\n");
+			continue;
+		}
+		printf("datetime is updated\n");
+		sleep(1);
+	}
+
+	return 0;
+}
+#endif /* KOO_OVS */
+
 #define FLOW_ON_OPEN		1
-#define FLOW_ON_REC			2
+#define FLOW_ON_REC		2
 #define FLOW_ON_CLOSE		3
 #define FLOW_ON_STOP		4
 
@@ -839,7 +1169,7 @@ static void *save_thread(void *arg)
 		printf("not support enc_type\r\n");
 		return 0;
 	}
-	printf("save %d (%s) .... ", p_stream0->save_count+1, file_path_main);
+	printf("save %d (%s) .... \n", p_stream0->save_count+1, file_path_main);
 
 	//----- open output files -----
 	if ((f_out_main = fopen(file_path_main, "wb")) == NULL) {
@@ -1000,7 +1330,13 @@ static void *flow_thread(void *arg)
 				printf("create save thread failed");
 				goto exit2;
 			}
-
+#ifdef KOO_OVS
+			ret = pthread_create(&p_stream2->update_osg_thread_id, NULL, update_osg_thread, (void *)p_stream2);
+			if (ret < 0) {
+				printf("create encode thread failed");
+				goto exit2;
+			}
+#endif /* KOO_OVS */
 			printf("start record.\r\n");
 			//printf("start record - begin\n");
 			// set videocap parameter (record)
@@ -1101,6 +1437,31 @@ MAIN(argc, argv)
 	UINT32 out_type = 1;
 	UINT32 enc_type = 0;
 
+#ifdef KOO_OVS
+	char                *font_file;
+	int                  font_size = 40;
+
+	//font_file = argv[1];          
+	font_file = "/etc/fonts/DroidSansFallback.ttf";
+	if (init_ftype(font_file, font_size, 0)) {
+		return -1;
+	}
+
+	if(create_datetime_image("Koo:", (unsigned short*)dimage)){
+		printf("fail to create datetime image\n");
+		return -1;
+	}
+
+	// init stamp data
+	stream2[0].stamp_blk  = 0;
+	stream2[0].stamp_pa   = 0;
+	stream2[0].stamp_size = query_osg_buf_size();
+	if(stream2[0].stamp_size <= 0){
+		printf("query_osg_buf_size() fail\n");
+		return -1;
+	}
+#endif /* KOO_OVS */
+
 	stream[0].hdmi_id=HD_VIDEOOUT_HDMI_1920X1080I60;//default
 	stream2[0].enc_type = enc_type;
 
@@ -1112,7 +1473,11 @@ MAIN(argc, argv)
 	}
 
 	// init memory
+#ifdef KOO_OVS
+	ret = mem_init(stream2[0].stamp_size);
+#else
 	ret = mem_init();
+#endif /* KOO_OVS */
 	if (ret != HD_OK) {
 		printf("mem fail=%d\n", ret);
 		goto exit;
@@ -1158,6 +1523,27 @@ MAIN(argc, argv)
 		goto exit;
 	}
 
+#ifdef KOO_OVS
+	ret = mem_alloc(stream2[0].stamp_size, &(stream2[0].stamp_blk), &(stream2[0].stamp_pa));
+	if(ret){
+		printf("fail to allocate stamp buffer\n");
+		goto exit;
+	}
+
+	//setup enc stamp parameter
+	if(set_enc_stamp_param(stream2[0].enc_stamp_path, stream2[0].stamp_pa, stream2[0].stamp_size, dimage)){
+		printf("fail to set enc stamp\r\n");
+		goto exit;
+	}
+
+	//render enc stamp
+	ret = hd_videoenc_start(stream2[0].enc_stamp_path);
+	if (ret != HD_OK) {
+		printf("start enc stamp fail=%d\n", ret);
+		goto exit;
+	}
+#endif /* KOO_OVS */
+
 	// create flow_thread
 	ret = pthread_create(&stream2[0].flow_thread_id, NULL, flow_thread, (void *)stream_list);
 	if (ret < 0) {
@@ -1176,7 +1562,7 @@ MAIN(argc, argv)
 	while (stream2[0].flow_state != FLOW_ON_REC) usleep(100); //wait unitl flow record
 
 	//Recording...
-	sleep(3);
+	sleep(7);
 
 	//3. FLOW_ON_STOP
 	stream2[0].flow_run = FLOW_ON_STOP; //stop record
@@ -1189,10 +1575,19 @@ MAIN(argc, argv)
 	while (stream2[0].flow_state != FLOW_ON_CLOSE) usleep(100); //wait unitl flow idle
 
 	stream2[0].flow_quit = 1;
+
 	// destroy save flow_thread
 	pthread_join(stream2[0].flow_thread_id, NULL);
+#ifdef KOO_OVS
+	pthread_join(stream2[0].update_osg_thread_id, NULL);
+#endif /* KOO_OVS */
 
 exit:
+#ifdef KOO_OVS
+	FT_Done_Face(face);
+	FT_Done_FreeType(library);
+#endif /* KOO_OVS */
+
 	// close video_liveview modules (liveview)
 	ret = close_module(&stream[0]);
 	if (ret != HD_OK) {
@@ -1210,6 +1605,12 @@ exit:
 	if (ret != HD_OK) {
 		printf("exit fail=%d\n", ret);
 	}
+
+#ifdef KOO_OVS
+	if(stream2[0].stamp_blk)
+		if(HD_OK != hd_common_mem_release_block(stream2[0].stamp_blk))
+			printf("hd_common_mem_release_block() fail\n");
+#endif /* KOO_OVS */
 
 	// uninit memory
 	ret = mem_exit();
