@@ -1435,7 +1435,7 @@ MAIN(argc, argv)
 	VIDEO_RECORD stream2[1] = {0}; //0: record stream
 	UINT32 stream_list[2] = {((UINT32)&stream[0]), ((UINT32)&stream2[0])};
 	UINT32 out_type = 1;
-	UINT32 enc_type = 0;
+	UINT32 enc_type = 1;
 
 #ifdef KOO_OVS
 	char                *font_file;
